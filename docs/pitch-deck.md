@@ -18,12 +18,12 @@
 - **HeyPay**
 - Pay any QRPH merchant with your Stellar balance.
 - Built for the Philippines, designed to plug into Stellar's global rails.
-- Project Lead: **[NAME]** · Team: **[PLACEHOLDER: team name]**
+- Built solo by **Ronald Ajusan** · **Artisam Labs**
 
 ![Real brand hero: phone scanning QRPH → cyan payment streams → Manila skyline at golden hour, with the HeyPay logo + wordmark lockup over a bottom scrim.](../homepage/hero.jpg)
 
 **Speaker notes:**
-Hi everyone, we're [team name], and this is HeyPay. Our one-liner: let anyone holding Stellar-network crypto pay at any QRPH merchant in the Philippines, with the merchant receiving pesos and zero new integration on their side. QRPH is already everywhere in the country; we connect it to a balance people already hold on Stellar. Today I'll cover the problem, a live demo, how it works, our impact on the Stellar ecosystem, how we plan to plug into Stellar's native rails (anchors, SEPs, the DEX), and our go-to-market plan from the Philippines outward to APAC and global.
+Hi everyone, I'm Ronald Ajusan of Artisam Labs, and this is HeyPay — a product I designed and built end to end, solo. The one-liner: let anyone holding Stellar-network crypto pay at any QRPH merchant in the Philippines, with the merchant receiving pesos and zero new integration on their side. QRPH is already everywhere in the country; HeyPay connects it to a balance people already hold on Stellar. Today I'll cover the problem, a live demo, how it works, our impact on the Stellar ecosystem, how we plan to plug into Stellar's native rails (anchors, SEPs, the DEX), and our go-to-market plan from the Philippines outward to APAC and global.
 
 ---
 
@@ -63,7 +63,9 @@ The hero flow — payer pays a merchant end-to-end:
 3. **Confirm** — amount and live rate, then tap to pay.
 4. **Watch it settle** — live status overlay → merchant paid in PHP.
 
-[PLACEHOLDER: Demo video — a 60–90 second screen recording of the full payer happy path (prefund → scan → confirm → live processing overlay → settled), then a 15 second cut to the merchant dashboard showing the received PHP. No audio needed; overlay text narrates each step.]
+▶ **[Watch the demo](https://drive.google.com/file/d/1tTFVrfG5xz-NVukqu6FlLgCSbrsCFPEZ/view?usp=drive_link)** — the full payer happy path (prefund → scan → confirm → live processing overlay → settled), then the merchant dashboard showing the received PHP.
+
+Live app: **<https://heypayfi.xyz>**
 
 **Speaker notes:**
 Here's the whole flow in one go. The payer starts on their dashboard, prefunds with XLM — the balance updates as the deposit clears. They hit Scan, point the camera at a merchant's QRPH code, and HeyPay recognizes it as a registered merchant. They enter the amount, see the live rate and exactly how much XLM leaves their wallet, and confirm. The processing overlay then shows every step happening in real time — rate locked, selling the XLM, paying out to the bank — until it confirms pesos were sent to the merchant. Cut to the merchant side: their dashboard shows the settled PHP and the transaction in their history.
@@ -180,15 +182,14 @@ What's built today is a real, working, feature-complete MVP across payer, mercha
 
 ## Slide 12: Team & Thanks
 
-- **[PLACEHOLDER: name]** — role
-- **[PLACEHOLDER: name]** — role
-- **[PLACEHOLDER: name]** — role
-- Contact: **[PLACEHOLDER: email / handle / project URL]**
+- **Ronald Ajusan** — solo developer: full-stack, design, and infrastructure
+- **Artisam Labs** — [artisam.xyz](https://artisam.xyz)
+- Contact: **ronaldajusan0@gmail.com** · **[github.com/ronaldajusan0/HeyPay](https://github.com/ronaldajusan0/HeyPay)**
 
 Thanks to the hackathon organizers, the Stellar developer documentation, and our exchange partner's public API documentation that informed the integration design.
 
 **Speaker notes:**
-We're [team name] — [brief intro per member]. Thanks to the organizers for the event, to the open Stellar developer documentation that made prototyping the payment-rail integration realistic, and to our exchange partner's public API docs. We'd love to talk to anyone interested in payments, Stellar ecosystem growth, or the Philippine market. You can reach us at [contact], and the project is at [URL]. Happy to take questions.
+That's HeyPay — and it's a one-person build. I'm Ronald Ajusan, working as Artisam Labs; I designed and wrote every layer you just saw: the payer, merchant, and admin surfaces, the settlement state machine and worker, the QRPH decoder, the deployment, and the tests. Thanks to the organizers for the event, to the open Stellar developer documentation that made prototyping the payment-rail integration realistic, and to our exchange partner's public API docs. I'd love to talk to anyone interested in payments, Stellar ecosystem growth, or the Philippine market. You can reach me at ronaldajusan0@gmail.com, and the project is at github.com/ronaldajusan0/HeyPay. Happy to take questions.
 
 ---
 
@@ -197,7 +198,7 @@ We're [team name] — [brief intro per member]. Thanks to the organizers for the
 _Read this straight through for a ~4–5 minute recording. Pauses are marked with `[pause]`._
 
 **[Slide 1 — Title]**
-Hey, everyone. We're [team name], and this is HeyPay. Our pitch in one line: let anyone holding Stellar-network crypto pay at any QRPH merchant in the Philippines — and let those merchants receive pesos with zero new integration. QRPH is already everywhere in the country. We just connect it to a balance people already hold on Stellar. I'll walk you through the problem, a live demo, how it works, our impact on the Stellar ecosystem, our integration roadmap, and our go-to-market. [pause]
+Hey, everyone. I'm Ronald Ajusan of Artisam Labs, and this is HeyPay — built solo, end to end. The pitch in one line: let anyone holding Stellar-network crypto pay at any QRPH merchant in the Philippines — and let those merchants receive pesos with zero new integration. QRPH is already everywhere in the country. HeyPay just connects it to a balance people already hold on Stellar. I'll walk you through the problem, a live demo, how it works, our impact on the Stellar ecosystem, our integration roadmap, and our go-to-market. [pause]
 
 **[Slide 2 — Problem]**
 The problem is two payment worlds that don't talk to each other. On one side, Philippine merchants have widely adopted QRPH — the national QR standard — and it lands pesos straight in their bank account. On the other side, people holding crypto like XLM can't spend it at those merchants. The only path today is manual: sell your crypto on an exchange, withdraw pesos to your bank, then go pay. Several apps, several fees, several minutes — and it kills the point of holding crypto for everyday spend. And merchants won't adopt a new system; they already have a working QR. [pause]
@@ -230,7 +231,7 @@ Our go-to-market is staged. In the Philippines now, we launch on QRPH and grow t
 The next steps that turn this into a licensed, scalable business: real KYC, AML, 2FA and fraud scoring; an explicit, transparent fee model; merchant discovery and recurring payments; native mobile apps; and proactive alerting on top of the health dashboard we've already built. Each is a scoped step, not a wishlist. [pause]
 
 **[Slide 12 — Team / thanks]**
-We're [team name]. Thanks to the organizers, the Stellar developer docs, and our exchange partner's public API docs. We'd love to talk to anyone interested in payments, Stellar ecosystem growth, or the Philippine market. Reach us at [contact], and the project is at [URL]. Thanks — we'll take questions.
+One last thing: this is a one-person build. I'm Ronald Ajusan, working as Artisam Labs, and I wrote every layer of what you just saw — payer, merchant, admin, the settlement worker, the QRPH decoder, the deployment, the tests. Thanks to the organizers, the Stellar developer docs, and our exchange partner's public API docs. I'd love to talk to anyone interested in payments, Stellar ecosystem growth, or the Philippine market. Reach me at ronaldajusan0@gmail.com, and the project is at github.com/ronaldajusan0/HeyPay. Thanks — happy to take questions.
 
 ---
 
@@ -320,4 +321,4 @@ Yes, and they're active and PH-localized right now. SDF's Stellar Community Fund
 Biggest risk: single-counterparty dependence on one exchange for conversion and payout — if that relationship or API changes, we're exposed. That's precisely what the anchor/SEP roadmap eliminates. On the moat: we're not claiming deep technical defensibility on day one — it's execution speed, the near-frictionless merchant onboarding into an existing rail, regulatory groundwork, and being first to make the Stellar-native, multi-anchor version of this work in the corridor.
 
 **Q24. What would you do with funding / what's the ask?**
-Three things, in order: (1) the compliance stack — KYC/AML, 2FA, transaction limits — to move real money legally; (2) the first anchor + USDC integration to kill the single-counterparty risk and prove the abstraction; and (3) go-to-market in the Philippines through the remittance corridor. That sequence turns a working demo into a licensed, defensible, and expandable business. [Tailor the specific amount/runway to your round.]
+We're asking for **$10,000 USDT**, deployed in three steps, in order: (1) the compliance stack — KYC/AML, 2FA, transaction limits — to move real money legally; (2) the first anchor + USDC integration to kill the single-counterparty risk and prove the abstraction; and (3) go-to-market in the Philippines through the remittance corridor. That sequence turns a working demo into a licensed, defensible, and expandable business. The product itself is already built and paid for — this funds the path to moving real money, not the engineering to get here.

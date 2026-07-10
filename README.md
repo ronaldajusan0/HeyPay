@@ -12,7 +12,7 @@ For the Stellar ecosystem, HeyPay is a concrete instance of "everyday spending u
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Version | `0.1.0` (`package.json`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Status  | **Feature-complete against `SPEC.md`.** Auth, payer (prefund/scan/pay/history/settings), merchant (onboarding/dashboard/transactions/QR/settings), and admin (users/merchants/payments/health) surfaces are all implemented, backed by 56 unit/integration test files and a 4-spec Playwright e2e suite wired into CI, with a Railway deployment config (`railway.json` + `Dockerfile`). No Soroban/on-chain contract layer exists — see [Smart Contracts](#smart-contracts) and [Ecosystem Roadmap](#ecosystem-roadmap--research). |
-| License | Not specified — no `LICENSE` file in the repo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| License | MIT — see [`LICENSE`](LICENSE)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## Problem
 
@@ -273,11 +273,11 @@ sequenceDiagram
 
 No Soroban contract crates exist in this repository (no `Cargo.toml` / `*.rs` files anywhere outside `node_modules`). Stellar interaction is limited to classic Horizon payment operations via `@stellar/stellar-sdk` (`src/server/stellar/wallet.ts`, `src/server/stellar/horizon.ts`) — there is no on-chain contract layer yet.
 
-<!-- PLACEHOLDER: Soroban smart contracts — document each contract's purpose, public functions, parameters, and deployment/upload process here. -->
+The planned first contract is a **Soroban escrow**: hold the payer's XLM on-chain from confirmation until the merchant's PHP payout is acknowledged, moving refund logic off HeyPay's servers and onto the chain so the payer need not trust the operator mid-settlement. It is not implemented — see [Ecosystem roadmap / research](#ecosystem-roadmap--research).
 
 ## Ecosystem roadmap / research
 
-HeyPay currently touches Stellar only through a custodial wallet and classic Horizon payments — it does not yet use any Stellar Ecosystem Proposal (SEP), the Stellar DEX, or Soroban. A companion research report evaluates how integrating **SEP-6/24/31 anchors, USDC, on-chain path payments, and Soroban escrow contracts** could reduce single-counterparty (PDAX) dependence, cut FX/volatility risk, and turn HeyPay into real Stellar-ecosystem infrastructure rather than a single-app demo — see the tracking GitHub issue for the full report and feature roadmap.
+HeyPay currently touches Stellar only through a custodial wallet and classic Horizon payments — it does not yet use any Stellar Ecosystem Proposal (SEP), the Stellar DEX, or Soroban. A companion research report evaluates how integrating **SEP-6/24/31 anchors, USDC, on-chain path payments, and Soroban escrow contracts** could reduce single-counterparty (PDAX) dependence, cut FX/volatility risk, and turn HeyPay into real Stellar-ecosystem infrastructure rather than a single-app demo — see [issue #160](https://github.com/ronaldajusan0/HeyPay/issues/160) for the full report and feature roadmap.
 
 ## Tech Stack
 
@@ -339,8 +339,8 @@ Required tooling: **Node ≥22**, **pnpm 10.33.0** (`packageManager` field — u
 1. **Clone and install dependencies**
 
    ```bash
-   git clone <repo-url>
-   cd heypay
+   git clone https://github.com/ronaldajusan0/HeyPay.git
+   cd HeyPay
    pnpm install
    ```
 
@@ -416,25 +416,33 @@ HeyPay deploys to **Railway** via `railway.json` + a 3-stage `Dockerfile`: a `we
 
 CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull requests, gating on typecheck/lint/format/audit/Vitest/build/Playwright e2e; it does not itself deploy.
 
-- Live app URL: `[PLACEHOLDER: Live app URL]`
-- Web service: `[PLACEHOLDER: Railway web service URL]`
-- Worker service: `[PLACEHOLDER: Railway worker service URL]`
+Live app: **<https://heypayfi.xyz>**
 
 ## Demo
 
-- Live app: `[PLACEHOLDER: Live app URL]`
-- Demo video: `[PLACEHOLDER: Demo video URL]`
-- Screenshot: `[PLACEHOLDER: screenshot]`
+- **Live app** — <https://heypayfi.xyz>
+- **Demo video** — [full payer → merchant flow, prefund through settlement](https://drive.google.com/file/d/1tTFVrfG5xz-NVukqu6FlLgCSbrsCFPEZ/view?usp=drive_link)
+
+### The hero flow, screen by screen
+
+| 1. Scan                                                                      | 2. Confirm                                                                                              |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| ![HeyPay scan screen pointed at a merchant's QRPH code.](homepage/step1.jpg) | ![HeyPay confirm screen: peso amount, live rate, network fee, rate-lock countdown.](homepage/step2.jpg) |
+
+| 3. Settle                                                                                                               | 4. Done                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| ![HeyPay processing screen tracking XLM on Stellar through conversion to the merchant bank payout.](homepage/step3.jpg) | ![HeyPay transactions screen showing a completed payment marked Settled.](homepage/step4.jpg) |
 
 ## Team
 
-| Name                  | Role                  | Contact                  |
-| --------------------- | --------------------- | ------------------------ |
-| `[PLACEHOLDER: name]` | `[PLACEHOLDER: role]` | `[PLACEHOLDER: contact]` |
-| `[PLACEHOLDER: name]` | `[PLACEHOLDER: role]` | `[PLACEHOLDER: contact]` |
+HeyPay is designed, built, and maintained by one person.
+
+| Name                                              | Role                                       | Contact                                                   |
+| ------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| [Ronald Ajusan](https://github.com/ronaldajusan0) | Solo developer — full-stack, design, infra | [ronaldajusan0@gmail.com](mailto:ronaldajusan0@gmail.com) |
+
+Built under [Artisam Labs](https://artisam.xyz).
 
 ## License
 
-No `LICENSE` file is present in this repository — license terms are undetermined. `[PLACEHOLDER: License]`
-#   H e y P a y  
- 
+MIT — see [`LICENSE`](LICENSE). Copyright © 2026 Ronald Ajusan (Artisam Labs).
