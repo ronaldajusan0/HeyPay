@@ -39,9 +39,7 @@ function eventId(): string {
 }
 
 function toError(err: unknown): Error {
-  return err instanceof Error
-    ? err
-    : new Error(typeof err === "string" ? err : JSON.stringify(err));
+  return err instanceof Error ? err : new Error(typeof err === "string" ? err : JSON.stringify(err));
 }
 
 async function sendToSentry(err: Error, context: Context, id: string): Promise<void> {

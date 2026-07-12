@@ -10,9 +10,9 @@ export async function GET(req: Request) {
   await destroySession();
   if (user)
     await audit({ actorId: user.id, action: "auth.logout", target: user.id, ip: clientIp(req) });
-  // Behind a proxy (Railway) req.url reflects the internal origin (localhost). Prefer the public
-  // host the proxy forwards via x-forwarded-host so the redirect targets the real domain; fall
-  // back to APP_URL for local dev (no forwarded header) — http://localhost:3000 unchanged.
+  // Behind a proxy (Railway) the public host arrives via x-forwarded-host; prefer it so the
+  // redirect targets the real domain even when APP_URL is misconfigured to localhost. Local dev
+  // has no forwarded header, so it falls back to APP_URL (http://localhost:3000) unchanged.
   const forwardedHost = req.headers.get("x-forwarded-host");
   const forwardedProto = req.headers.get("x-forwarded-proto") ?? "https";
   const base = forwardedHost

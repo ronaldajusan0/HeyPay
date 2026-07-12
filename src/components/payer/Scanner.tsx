@@ -77,7 +77,10 @@ export function Scanner() {
         body: JSON.stringify({ merchantId: mId, amountPhp }),
       });
       if (!res.ok) {
-        setStatus("Could not start payment. Try again.");
+        const body = (await res.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        setStatus(body?.error?.message ?? "Could not start payment. Try again.");
         return;
       }
       const { paymentId } = (await res.json()) as { paymentId: string };
@@ -111,9 +114,7 @@ export function Scanner() {
 
   async function startCamera() {
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-      setStatus(
-        "Camera needs a secure (HTTPS) connection. Open the secure URL or upload the QR image.",
-      );
+      setStatus("Camera needs a secure (HTTPS) connection. Open the secure URL or upload the QR image.");
       return;
     }
     try {

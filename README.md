@@ -273,7 +273,7 @@ sequenceDiagram
 
 ## Smart Contracts
 
-HeyPay has no Soroban contracts. Stellar interaction is limited to classic Horizon payment operations via `@stellar/stellar-sdk` (`src/server/stellar/wallet.ts`, `src/server/stellar/horizon.ts`).
+HeyPay has no Soroban contracts, so there is **no smart contract testnet address** — Stellar interaction is limited to classic Horizon payment operations via `@stellar/stellar-sdk` (`src/server/stellar/wallet.ts`, `src/server/stellar/horizon.ts`).
 
 The planned first contract is a **Soroban escrow**: hold the payer's XLM on-chain from confirmation until the merchant's PHP payout is acknowledged, moving refund logic off HeyPay's servers and onto the chain so the payer need not trust the operator mid-settlement. It is not implemented — see [Ecosystem roadmap / research](#ecosystem-roadmap--research).
 
@@ -423,7 +423,8 @@ Live app: **<https://heypayfi.xyz>**
 ## Demo
 
 - **Live app** — <https://heypayfi.xyz>
-- **Demo video** — [full payer → merchant flow, prefund through settlement](https://drive.google.com/file/d/1tTFVrfG5xz-NVukqu6FlLgCSbrsCFPEZ/view?usp=drive_link)
+- **Demo video** — [full payer → merchant flow, prefund through settlement](https://drive.google.com/file/d/180WchiglLB2r86xSGTnYe4oCA0aw39xl/view?usp=drive_link)
+- **Pitch deck** — [HeyPay pitch deck (Google Slides)](https://docs.google.com/presentation/d/1DgvF_3rFOoeh-4ty3xClKzs5l2eVVQub/edit?usp=drive_link&ouid=105919425575897775501&rtpof=true&sd=true)
 
 ### The hero flow, screen by screen
 

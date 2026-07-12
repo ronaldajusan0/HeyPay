@@ -100,6 +100,54 @@ describe("WalletService.sendXlm", () => {
   });
 });
 
+describe("WalletService submit-error translation", () => {
+  /** A Horizon 400 as the SDK's axios surfaces it: a useless message, real codes. */
+  const horizon400 = (operations: string[]) =>
+    Object.assign(new Error("Request failed with status code 400"), {
+      response: { data: { extras: { result_codes: { transaction: "tx_failed", operations } } } },
+    });
+
+  async function sendWith(error: unknown) {
+    const seed = createWalletService(fakeServer(), PASSPHRASE);
+    const { publicKey, encryptedSecret } = seed.generate();
+    const server = fakeServer({
+      loadAccount: vi.fn().mockResolvedValue({
+        accountId: () => publicKey,
+        sequenceNumber: () => "1",
+        incrementSequenceNumber: () => undefined,
+      }),
+      fetchBaseFee: vi.fn().mockResolvedValue(100),
+      submitTransaction: vi.fn().mockRejectedValue(error),
+    });
+    return createWalletService(server, PASSPHRASE).sendXlm({
+      encryptedSecret,
+      destination: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
+      amountXlm: new Decimal("1"),
+      memo: "TXN-1",
+    });
+  }
+
+  it("explains op_no_trust rather than 'Request failed with status code 400'", async () => {
+    await expect(sendWith(horizon400(["op_no_trust"]))).rejects.toThrow(
+      /destination account does not accept this asset.*op_no_trust/,
+    );
+  });
+
+  it("explains op_underfunded", async () => {
+    await expect(sendWith(horizon400(["op_underfunded"]))).rejects.toThrow(
+      /does not hold enough of this asset/,
+    );
+  });
+
+  it("names an unmapped operation code rather than swallowing it", async () => {
+    await expect(sendWith(horizon400(["op_malformed"]))).rejects.toThrow(/op_malformed/);
+  });
+
+  it("rethrows an error carrying no Horizon result codes", async () => {
+    await expect(sendWith(new Error("socket hang up"))).rejects.toThrow("socket hang up");
+  });
+});
+
 describe("WalletService.confirmTx", () => {
   it("returns true for a successful tx", async () => {
     const call = vi.fn().mockResolvedValue({ successful: true });
@@ -170,9 +218,10 @@ describe("WalletService.listIncomingPayments", () => {
     // payment TO GME, and the create_account that first funded GME; GOTHER's excluded.
     expect(out.items).toHaveLength(2);
     expect(out.items[0]!.txHash).toBe("h1");
-    expect(out.items[0]!.amountXlm.equals(new Decimal("10.0"))).toBe(true);
+    expect(out.items[0]!.amount.equals(new Decimal("10.0"))).toBe(true);
+    expect(out.items[0]!.asset).toBe("XLM");
     expect(out.items[1]!.txHash).toBe("h3");
-    expect(out.items[1]!.amountXlm.equals(new Decimal("1.0"))).toBe(true);
+    expect(out.items[1]!.amount.equals(new Decimal("1.0"))).toBe(true);
     expect(out.items[1]!.from).toBe("GX");
     expect(out.cursor).toBe("c3"); // advances past every scanned record
     expect(builder.cursor).toHaveBeenCalledWith("c0");
