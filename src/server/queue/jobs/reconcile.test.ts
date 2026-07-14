@@ -31,6 +31,13 @@ vi.mock("@/server/queue/queues", () => ({
   enqueueSettle: (id: string) => enqueueSettle(id),
 }));
 
+const { captureException } = vi.hoisted(() => ({
+  captureException: vi.fn((_err: unknown, _ctx?: unknown) => "event-id"),
+}));
+vi.mock("@/server/observability/error-tracking", () => ({
+  captureException: (err: unknown, ctx?: unknown) => captureException(err, ctx),
+}));
+
 import { processReconcileJob } from "./reconcile";
 
 async function makeInFlightPayment(opts: {
@@ -81,6 +88,26 @@ describe("processReconcileJob — wallet (XLM) leg", () => {
       cached: "10.0000000",
       horizon: "9.0000000",
     });
+    // Drift this size means payments will fail on-chain — alerted, not just audited.
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException.mock.calls[0]![1]).toMatchObject({
+      source: "reconcile",
+      walletId: wallet.id,
+      asset: "XLM",
+      moneyAtRisk: true,
+    });
+  });
+
+  it("audits — but does not alert — fee-dust drift below the threshold", async () => {
+    // Failed submissions burn the fee on-chain without a local debit; a few
+    // stroops of drift is expected noise, not an incident.
+    const { wallet } = await makePayer({ cachedXlm: "10.0000000" });
+    getBalances.mockResolvedValue(horizonXlm("9.9999200"));
+
+    const res = await processReconcileJob();
+    expect(res.drift).toBe(1);
+    expect(await db.auditLog.count({ where: { action: "reconcile.drift", target: wallet.id } })).toBe(1);
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it("flags drift on an issued asset, not just XLM", async () => {

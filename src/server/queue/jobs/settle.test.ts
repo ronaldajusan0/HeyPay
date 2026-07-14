@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Keypair } from "@stellar/stellar-sdk";
 import { resetDb, makePayer, makeMerchant } from "../../../../tests/helpers/db";
 import { db } from "@/server/db";
 import { dec } from "@/lib/money";
 import { newPaymentReference } from "@/server/payments/reference";
+import { __resetTreasuryForTests } from "@/server/stellar/treasury";
+
+// Refunds are fronted on-chain by the treasury wallet.
+const TREASURY_SECRET = Keypair.random().secret();
 
 // ---- mock externals ----
 const { sendAsset, sendAssetViaPath, confirmTx, findConversionRoute } = vi.hoisted(() => ({
@@ -120,6 +125,8 @@ function mockHappyRail() {
 describe("processSettleJob", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.STELLAR_TREASURY_SECRET = TREASURY_SECRET;
+    __resetTreasuryForTests();
     return resetDb();
   });
 
@@ -169,7 +176,9 @@ describe("processSettleJob", () => {
   });
 
   it("forced post-Stellar (trade) failure → REFUND_PENDING → REFUNDED with one debit + one credit", async () => {
-    sendAsset.mockResolvedValue({ txHash: "STELLARHASH3" });
+    sendAsset
+      .mockResolvedValueOnce({ txHash: "STELLARHASH3" }) // payment leg
+      .mockResolvedValueOnce({ txHash: "REFUNDHASH3" }); // treasury refund leg
     getDepositAddress.mockResolvedValue({ address: XLM_DEPOSIT, memo: null });
     confirmTx.mockResolvedValue(true);
     sellCryptoForPhp.mockResolvedValue({ tradeRef: "TRADE3" });
@@ -188,6 +197,13 @@ describe("processSettleJob", () => {
     expect(debits).toHaveLength(1);
     expect(credits).toHaveLength(1);
     expect(credits[0]!.amount.toFixed(7)).toBe("8.3333434");
+    // The refund physically went on-chain, from the treasury to the payer.
+    expect(final.refundTxHash).toBe("REFUNDHASH3");
+    expect(credits[0]!.stellarTxHash).toBe("REFUNDHASH3");
+    const refundSend = sendAsset.mock.calls[1]![0];
+    expect(refundSend.destination).toBe(wallet.stellarPublicKey);
+    expect(refundSend.asset).toBe("XLM");
+    expect(refundSend.amount.toFixed(7)).toBe("8.3333434");
     // admin alerted
     expect(await db.auditLog.count({ where: { action: "payment.refunded" } })).toBe(1);
     // event trail includes REFUND_PENDING then REFUNDED
@@ -199,11 +215,65 @@ describe("processSettleJob", () => {
     expect(toStatuses).toContain("REFUND_PENDING");
     expect(toStatuses).toContain("REFUNDED");
   });
+
+  it("refund stays REFUND_PENDING — no ledger credit — when the treasury is not configured", async () => {
+    delete process.env.STELLAR_TREASURY_SECRET;
+    __resetTreasuryForTests();
+    sendAsset.mockResolvedValue({ txHash: "STELLARHASH5" });
+    getDepositAddress.mockResolvedValue({ address: XLM_DEPOSIT, memo: null });
+    confirmTx.mockResolvedValue(true);
+    sellCryptoForPhp.mockResolvedValue({ tradeRef: "TRADE5" });
+    getTradeStatus.mockResolvedValue({ state: "FAILED" });
+
+    const { wallet, payment } = await makeAuthorized();
+    const final = await drive(payment.id);
+
+    // Not FAILED: that would silently abandon money the payer is owed.
+    expect(final.status).toBe("REFUND_PENDING");
+    expect(final.failureReason).toMatch(/STELLAR_TREASURY_SECRET/);
+    expect(
+      await db.walletTransaction.count({ where: { walletId: wallet.id, type: "REFUND_CREDIT" } }),
+    ).toBe(0);
+  });
+
+  it("holds the ledger credit until the on-chain refund confirms, then credits exactly once", async () => {
+    sendAsset
+      .mockResolvedValueOnce({ txHash: "STELLARHASH6" })
+      .mockResolvedValueOnce({ txHash: "REFUNDHASH6" });
+    getDepositAddress.mockResolvedValue({ address: XLM_DEPOSIT, memo: null });
+    // The payment tx confirms; the refund tx does not (yet).
+    confirmTx.mockImplementation(async (h: string) => h !== "REFUNDHASH6");
+    sellCryptoForPhp.mockResolvedValue({ tradeRef: "TRADE6" });
+    getTradeStatus.mockResolvedValue({ state: "FAILED" });
+
+    const { wallet, payment } = await makeAuthorized();
+    const pending = await drive(payment.id);
+
+    expect(pending.status).toBe("REFUND_PENDING");
+    expect(pending.refundTxHash).toBe("REFUNDHASH6"); // recorded before confirm
+    expect(
+      await db.walletTransaction.count({ where: { walletId: wallet.id, type: "REFUND_CREDIT" } }),
+    ).toBe(0);
+
+    // The tx lands; the next (reconcile-driven) attempt completes the refund
+    // without re-sending it.
+    const sendsSoFar = sendAsset.mock.calls.length;
+    confirmTx.mockResolvedValue(true);
+    const final = await drive(payment.id);
+
+    expect(final.status).toBe("REFUNDED");
+    expect(sendAsset.mock.calls.length).toBe(sendsSoFar); // no second on-chain refund
+    expect(
+      await db.walletTransaction.count({ where: { walletId: wallet.id, type: "REFUND_CREDIT" } }),
+    ).toBe(1);
+  });
 });
 
 describe("processSettleJob (USDT)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.STELLAR_TREASURY_SECRET = TREASURY_SECRET;
+    __resetTreasuryForTests();
     return resetDb();
   });
 
@@ -280,7 +350,9 @@ describe("processSettleJob (USDT)", () => {
   });
 
   it("refunds USDT — not XLM — and does not return the spent network fee", async () => {
-    sendAsset.mockResolvedValue({ txHash: "USDTHASH3" });
+    sendAsset
+      .mockResolvedValueOnce({ txHash: "USDTHASH3" }) // payment leg
+      .mockResolvedValueOnce({ txHash: "REFUNDHASH-U" }); // treasury refund leg
     getDepositAddress.mockResolvedValue({ address: USDT_DEPOSIT, memo: null });
     confirmTx.mockResolvedValue(true);
     sellCryptoForPhp.mockResolvedValue({ tradeRef: "TRADE-U" });
@@ -296,6 +368,9 @@ describe("processSettleJob (USDT)", () => {
     expect(credits).toHaveLength(1);
     expect(credits[0]!.asset).toBe("USDT");
     expect(credits[0]!.amount.toFixed(7)).toBe("1.7241380");
+    // The on-chain refund is in the payer's asset, from the treasury.
+    expect(sendAsset.mock.calls[1]![0].asset).toBe("USDT");
+    expect(sendAsset.mock.calls[1]![0].destination).toBe(wallet.stellarPublicKey);
 
     const usdtBalance = await db.walletBalance.findUniqueOrThrow({
       where: { walletId_asset: { walletId: wallet.id, asset: "USDT" } },

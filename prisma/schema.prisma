@@ -204,6 +204,9 @@ model Payment {
   stellarTxHash     String?       @unique
   pdaxTradeRef      String?
   pdaxCashoutRef    String?
+  // on-chain refund from the treasury wallet; recorded before the ledger credit
+  // so a retry re-confirms this tx instead of paying the refund twice
+  refundTxHash      String?       @unique
 
   quoteExpiresAt    DateTime?
   createdAt         DateTime      @default(now())

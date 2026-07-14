@@ -4,6 +4,7 @@ import { PaymentStatus } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { rail } from "@/server/rails";
 import { walletService } from "@/server/stellar/wallet";
+import { getTreasury } from "@/server/stellar/treasury";
 import { findConversionRoute } from "@/server/stellar/paths";
 import { dec, type Decimal } from "@/lib/money";
 import { isIssuedAsset, type PaymentAsset } from "@/lib/assets";
@@ -301,12 +302,54 @@ async function stepPollPayout(p: PaymentWithRels): Promise<void> {
   await applyTransition(db, p, PaymentStatus.SETTLED, { netSettledPhp: netPhp.toFixed(2) });
 }
 
-// REFUND_PENDING → REFUNDED (credit payer wallet; alert admin)
+// REFUND_PENDING → REFUNDED (return the crypto on-chain, then credit the ledger; alert admin)
 async function stepRefund(p: PaymentWithRels): Promise<void> {
   const wallet = p.payer.wallet!;
   // Refund the asset that left the wallet. The XLM network fee was consumed by
   // the Stellar network and is not recoverable, so it is not credited back.
   const { asset, assetAmount } = legs(p);
+
+  // The payer's crypto was already sold at the rail, so the refund is fronted
+  // on-chain by the treasury wallet. The ledger credit must never outrun the
+  // chain: a DB-only credit shows the payer a balance Stellar will reject
+  // (op_underfunded) on their next payment.
+  const credited = await db.walletTransaction.findFirst({
+    where: { paymentId: p.id, type: "REFUND_CREDIT" },
+  });
+  let txHash = p.refundTxHash;
+  if (!credited) {
+    if (!txHash) {
+      const treasury = getTreasury();
+      if (!treasury) {
+        throw new Error(
+          `refund ${p.reference} requires STELLAR_TREASURY_SECRET to return ${asset} on-chain`,
+        );
+      }
+      const res = await withRetry(
+        () =>
+          walletService.sendAsset({
+            encryptedSecret: treasury.encryptedSecret,
+            destination: wallet.stellarPublicKey,
+            asset,
+            amount: assetAmount,
+            memo: `refund ${p.reference}`,
+          }),
+        { label: "refundSendAsset" },
+      );
+      txHash = res.txHash;
+      await db.payment.update({ where: { id: p.id }, data: { refundTxHash: txHash } });
+    }
+    // Never clear refundTxHash on a confirm miss — the tx may still land within
+    // its timebounds, and resubmitting would refund twice. Reconcile re-drives
+    // this step until it confirms.
+    const ok = await withRetry(() => walletService.confirmTx(txHash!), {
+      label: "refundConfirmTx",
+    });
+    if (!ok) {
+      throw new Error(`refund tx ${txHash} for ${p.reference} not confirmed yet`);
+    }
+  }
+
   await db.$transaction(async (tx) => {
     const existing = await tx.walletTransaction.findFirst({
       where: { paymentId: p.id, type: "REFUND_CREDIT" },
@@ -320,6 +363,7 @@ async function stepRefund(p: PaymentWithRels): Promise<void> {
           asset,
           amount: assetAmount.toFixed(7),
           balanceAfter: balanceAfter.toFixed(7),
+          stellarTxHash: txHash,
           paymentId: p.id,
           memo: `refund ${p.reference}`,
         },
@@ -328,6 +372,7 @@ async function stepRefund(p: PaymentWithRels): Promise<void> {
     await applyTransition(tx, p, PaymentStatus.REFUNDED, {
       asset,
       refundedAsset: assetAmount.toFixed(7),
+      refundTxHash: txHash,
     });
   });
   await audit({
@@ -355,8 +400,17 @@ async function handleFailure(p: PaymentWithRels, err: unknown): Promise<void> {
     paymentId: p.id,
     reference: p.reference,
     status: current.status,
-    moneyAtRisk: XLM_MOVED.has(current.status),
+    moneyAtRisk:
+      XLM_MOVED.has(current.status) || current.status === PaymentStatus.REFUND_PENDING,
   });
+
+  // A refund attempt that failed (treasury unfunded, Horizon down, tx not yet
+  // confirmed) must stay REFUND_PENDING — marking it FAILED would silently
+  // abandon money the payer is owed. Reconcile re-enqueues stuck refunds.
+  if (current.status === PaymentStatus.REFUND_PENDING) {
+    await db.payment.update({ where: { id: p.id }, data: { failureReason: reason } });
+    return;
+  }
 
   if (XLM_MOVED.has(current.status)) {
     // Crypto already left the wallet → refund branch.

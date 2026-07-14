@@ -50,6 +50,10 @@ export async function processReconcileJob(): Promise<ReconcileResult> {
   };
 }
 
+// Fee dust from failed submissions (charged on-chain, never debited locally)
+// accumulates a few stroops at a time; below this it is logged but not alerted.
+const DRIFT_ALERT_THRESHOLD = dec(process.env.RECONCILE_DRIFT_ALERT_THRESHOLD ?? "0.001");
+
 // Crypto leg: diff each custodial wallet's cached balances against Horizon, for
 // every enabled asset — an untracked USDT balance is as much a discrepancy as an
 // untracked XLM one. A wallet with drift in two assets counts once.
@@ -76,6 +80,7 @@ async function reconcileWallets(): Promise<{ checked: number; drift: number }> {
       const cached = cachedBalances.find((b) => b.asset === asset)?.cached ?? dec("0");
       if (cached.equals(balance)) continue;
       walletDrifted = true;
+      const delta = balance.minus(cached);
       await audit({
         action: "reconcile.drift",
         target: wallet.id,
@@ -84,9 +89,27 @@ async function reconcileWallets(): Promise<{ checked: number; drift: number }> {
           asset,
           cached: cached.toFixed(7),
           horizon: balance.toFixed(7),
-          delta: balance.minus(cached).toFixed(7),
+          delta: delta.toFixed(7),
         },
       });
+      // An audit row is invisible until someone goes looking; a cached balance
+      // the chain can't honor makes payments fail (op_underfunded), so raise it
+      // where operators actually watch.
+      if (delta.abs().greaterThanOrEqualTo(DRIFT_ALERT_THRESHOLD)) {
+        captureException(
+          new Error(
+            `wallet ${wallet.id} ${asset} balance drift: cached ${cached.toFixed(7)} vs on-chain ${balance.toFixed(7)}`,
+          ),
+          {
+            source: "reconcile",
+            walletId: wallet.id,
+            publicKey: wallet.stellarPublicKey,
+            asset,
+            delta: delta.toFixed(7),
+            moneyAtRisk: true,
+          },
+        );
+      }
     }
     if (walletDrifted) drift++;
   }
