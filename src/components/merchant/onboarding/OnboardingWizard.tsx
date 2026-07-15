@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FloatingInput } from "@/components/ui/FloatingInput";
 import { SUPPORTED_BANKS } from "@/server/merchant/banks";
+import { TEST_SETTLEMENT } from "@/lib/test-accounts";
 import { presignAndUpload } from "@/lib/client/upload";
 import { decodeImageToRaw } from "@/lib/client/qr";
 import type { MerchantDto } from "@/server/merchant/service";
@@ -139,6 +140,23 @@ export function OnboardingWizard({ initial }: { initial: MerchantDto | null }) {
               <p className="text-body-sm text-on-surface-variant">
                 PHP from each payment lands here.
               </p>
+              {/* Test-environment notice: which bank + account number to use. */}
+              <div
+                role="note"
+                className="rounded-lg bg-primary/10 p-stack-md text-body-sm text-on-surface"
+              >
+                <p className="mb-stack-sm flex items-center gap-stack-sm font-semibold text-primary">
+                  <span className="material-symbols-outlined text-base">account_balance</span>
+                  Use this test settlement account
+                </p>
+                <p className="text-on-surface-variant">
+                  Bank:{" "}
+                  <span className="font-medium text-on-surface">{TEST_SETTLEMENT.bankName}</span>
+                  {" · "}
+                  Account no.:{" "}
+                  <span className="font-mono text-on-surface">{TEST_SETTLEMENT.accountNumber}</span>
+                </p>
+              </div>
               <fieldset className="grid grid-cols-2 gap-stack-md">
                 <legend className="mb-stack-sm text-label-md uppercase text-on-surface-variant">
                   Bank or wallet

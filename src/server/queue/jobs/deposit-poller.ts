@@ -4,6 +4,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { redis } from "@/server/redis";
 import { walletService } from "@/server/stellar/wallet";
+import { getTreasury } from "@/server/stellar/treasury";
 import { dec, Decimal } from "@/lib/money";
 import { enabledAssets, isIssuedAsset, type PaymentAsset } from "@/lib/assets";
 import { isAssetConfigured, TRUSTLINE_XLM_REQUIREMENT } from "@/server/stellar/assets";
@@ -68,8 +69,14 @@ export async function syncWalletDeposits(walletId: string): Promise<{
   );
 
   let newDeposits = 0;
+  // A refund lands on the payer's own custodial wallet as an incoming payment from
+  // the treasury. Those are owned by the settlement job (recorded as REFUND_CREDIT);
+  // recording them here too would double-credit the balance and collide on the
+  // unique stellarTxHash. Identify the treasury so its sends can be skipped.
+  const treasuryKey = getTreasury()?.publicKey;
 
   for (const item of items) {
+    if (treasuryKey && item.from === treasuryKey) continue; // refund, not a prefund deposit
     // Idempotent: stellarTxHash is @unique on WalletTransaction.
     const exists = await db.walletTransaction.findUnique({ where: { stellarTxHash: item.txHash } });
     if (exists) continue;

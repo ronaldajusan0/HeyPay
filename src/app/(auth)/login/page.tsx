@@ -2,6 +2,8 @@
 import { useActionState } from "react";
 import { loginAction, type AuthState } from "../actions";
 import { FloatingInput } from "@/components/auth/FloatingInput";
+import { TestAccountsCard } from "@/components/auth/TestAccountsCard";
+import { showTestAccounts } from "@/lib/test-accounts";
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState<AuthState, FormData>(loginAction, {});
@@ -40,6 +42,7 @@ export default function LoginPage() {
       <a href="/signup" className="text-center text-body-sm text-primary">
         Create an account
       </a>
+      {showTestAccounts() ? <TestAccountsCard /> : null}
     </main>
   );
 }

@@ -1,7 +1,10 @@
 import "dotenv/config";
+import { createCipheriv, randomBytes } from "node:crypto";
 import * as argon2 from "argon2";
+import { Keypair } from "@stellar/stellar-sdk";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Role, MerchantStatus } from "../src/generated/prisma/client";
+import { TEST_ACCOUNTS } from "../src/lib/test-accounts";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is not set");
@@ -12,6 +15,42 @@ const prisma = new PrismaClient({ adapter });
 // Minimal inline argon2id hash so the seed is self-contained (Phase 2 centralizes this).
 async function hashPassword(plain: string): Promise<string> {
   return argon2.hash(plain, { type: argon2.argon2id });
+}
+
+// Inline AES-256-GCM secret encryption, byte-for-byte compatible with
+// src/server/crypto/envelope.ts (which is server-only and can't be imported here).
+// A payer needs a custodial wallet or the payer UI renders blank.
+function encryptSecret(plaintext: string): string {
+  const raw = process.env.ENCRYPTION_MASTER_KEY;
+  if (!raw) throw new Error("ENCRYPTION_MASTER_KEY is not set");
+  const version = Number(process.env.ENCRYPTION_KEY_VERSION ?? "1");
+  const b64 = raw.startsWith("base64:") ? raw.slice("base64:".length) : raw;
+  const key = Buffer.from(b64, "base64");
+  if (key.length !== 32) {
+    throw new Error("ENCRYPTION_MASTER_KEY must decode to exactly 32 bytes (AES-256)");
+  }
+  const iv = randomBytes(12); // GCM standard nonce length
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `v${version}:${iv.toString("base64")}:${tag.toString("base64")}:${ciphertext.toString(
+    "base64",
+  )}`;
+}
+
+// Mirrors walletService.generate() (src/server/stellar/wallet.ts) without the
+// server-only import chain.
+function generateWallet(): {
+  publicKey: string;
+  encryptedSecret: string;
+  secretKeyVersion: number;
+} {
+  const kp = Keypair.random();
+  return {
+    publicKey: kp.publicKey(),
+    encryptedSecret: encryptSecret(kp.secret()),
+    secretKeyVersion: Number(process.env.ENCRYPTION_KEY_VERSION ?? "1"),
+  };
 }
 
 async function seedAdmin(): Promise<void> {
@@ -41,6 +80,47 @@ async function seedAdmin(): Promise<void> {
       });
     }
     console.log("[seed] admin password-change gate marked satisfied");
+  }
+}
+
+// Hardcoded test/demo accounts (src/lib/test-accounts.ts). Always seeded so the
+// credentials shown on the login page actually work. The merchant gets a
+// pre-filled Security Bank settlement account.
+async function seedTestAccounts(): Promise<void> {
+  for (const acc of TEST_ACCOUNTS) {
+    const passwordHash = await hashPassword(acc.password);
+    const user = await prisma.user.upsert({
+      where: { username: acc.username },
+      update: { role: Role[acc.role], isActive: true, passwordHash },
+      create: { username: acc.username, passwordHash, role: Role[acc.role] },
+    });
+
+    if (acc.role === "PAYER") {
+      // Without a custodial wallet the payer dashboard/prefund pages render blank.
+      const existing = await prisma.custodialWallet.findUnique({ where: { userId: user.id } });
+      if (existing) {
+        // keep — regenerating would orphan any funds already sent to the old address
+      } else if (!process.env.ENCRYPTION_MASTER_KEY) {
+        console.warn(`[seed] ENCRYPTION_MASTER_KEY not set; ${acc.username} has no wallet`);
+      } else {
+        const w = generateWallet();
+        await prisma.custodialWallet.create({
+          data: {
+            userId: user.id,
+            stellarPublicKey: w.publicKey,
+            encryptedSecret: w.encryptedSecret,
+            secretKeyVersion: w.secretKeyVersion,
+          },
+        });
+        console.log(`[seed] wallet ready for ${acc.username}: ${w.publicKey}`);
+      }
+    }
+
+    // NOTE: no Merchant profile is seeded for the test merchant on purpose — they
+    // must complete onboarding after logging in (business name, settlement account,
+    // QRPH). With no profile, requireMerchant() redirects them to /merchant/onboarding.
+    // The onboarding form shows the Security Bank test settlement account to enter.
+    console.log(`[seed] test ${acc.role.toLowerCase()} ready: ${acc.username}`);
   }
 }
 
@@ -94,6 +174,7 @@ async function seedDemo(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  await seedTestAccounts();
   await seedAdmin();
   await seedDemo();
 }

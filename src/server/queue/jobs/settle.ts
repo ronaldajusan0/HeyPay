@@ -354,7 +354,14 @@ async function stepRefund(p: PaymentWithRels): Promise<void> {
     const existing = await tx.walletTransaction.findFirst({
       where: { paymentId: p.id, type: "REFUND_CREDIT" },
     });
-    if (!existing) {
+    // Defensive: the refund is an incoming tx to the payer's own wallet. An earlier
+    // build let the deposit poller record it first as a PREFUND_DEPOSIT (stellarTxHash
+    // is @unique), which already restored the balance and blocked this credit. If any
+    // row already carries this hash, the crypto is back — finalise without re-crediting.
+    const alreadyOnLedger = txHash
+      ? await tx.walletTransaction.findFirst({ where: { stellarTxHash: txHash } })
+      : null;
+    if (!existing && !alreadyOnLedger) {
       const balanceAfter = await creditAsset(tx, wallet.id, asset, assetAmount);
       await tx.walletTransaction.create({
         data: {
@@ -400,8 +407,7 @@ async function handleFailure(p: PaymentWithRels, err: unknown): Promise<void> {
     paymentId: p.id,
     reference: p.reference,
     status: current.status,
-    moneyAtRisk:
-      XLM_MOVED.has(current.status) || current.status === PaymentStatus.REFUND_PENDING,
+    moneyAtRisk: XLM_MOVED.has(current.status) || current.status === PaymentStatus.REFUND_PENDING,
   });
 
   // A refund attempt that failed (treasury unfunded, Horizon down, tx not yet
