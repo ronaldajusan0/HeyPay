@@ -68,6 +68,7 @@ jobs:
 
       - name: Create test databases
         run: |
+          PGPASSWORD=heypay psql -h localhost -U heypay -d heypay -c "CREATE DATABASE heypay_test;" || true
           PGPASSWORD=heypay psql -h localhost -U heypay -d heypay -c "CREATE DATABASE heypay_shadow;" || true
           PGPASSWORD=heypay psql -h localhost -U heypay -d heypay -c "CREATE DATABASE heypay_e2e;" || true
           PGPASSWORD=heypay psql -h localhost -U heypay -d heypay -c "CREATE DATABASE heypay_e2e_shadow;" || true
@@ -76,7 +77,11 @@ jobs:
         run: pnpm prisma generate
 
       - name: Migrate (test db)
-        run: pnpm prisma migrate deploy
+        # Unit/integration tests load .env.test, which points DATABASE_URL at
+        # heypay_test — migrate that DB too, not just the default one.
+        run: |
+          pnpm prisma migrate deploy
+          DATABASE_URL=postgresql://heypay:heypay@localhost:5432/heypay_test?schema=public pnpm prisma migrate deploy
 
       - name: Typecheck
         run: pnpm typecheck
