@@ -86,7 +86,9 @@ async function main() {
       `${rows.length - settledCount - inflight} failed/refunded (of ${rows.length}).`,
   );
   if (inflight > 0) {
-    console.log("In-flight = worker not draining the settle queue (check it's Online + shares REDIS_URL).");
+    console.log(
+      "In-flight = worker not draining the settle queue (check it's Online + shares REDIS_URL).",
+    );
   }
 }
 

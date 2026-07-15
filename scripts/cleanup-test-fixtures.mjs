@@ -21,17 +21,19 @@ if (!envLine) {
   console.error("error: DATABASE_URL missing in .env");
   process.exit(1);
 }
-const url = envLine.slice("DATABASE_URL=".length).replace(/\s+#.*$/, "").trim();
+const url = envLine
+  .slice("DATABASE_URL=".length)
+  .replace(/\s+#.*$/, "")
+  .trim();
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const client = new pg.Client(url);
 await client.connect();
 try {
   await client.query("BEGIN");
-  const users = await client.query(
-    `select id, username from "User" where username ~ $1`,
-    [`^(payer|merchant)-${UUID}$`],
-  );
+  const users = await client.query(`select id, username from "User" where username ~ $1`, [
+    `^(payer|merchant)-${UUID}$`,
+  ]);
   const ids = users.rows.map((r) => r.id);
   console.log(`fixture users found: ${ids.length}`);
   if (ids.length === 0) {

@@ -106,7 +106,9 @@ describe("processReconcileJob — wallet (XLM) leg", () => {
 
     const res = await processReconcileJob();
     expect(res.drift).toBe(1);
-    expect(await db.auditLog.count({ where: { action: "reconcile.drift", target: wallet.id } })).toBe(1);
+    expect(
+      await db.auditLog.count({ where: { action: "reconcile.drift", target: wallet.id } }),
+    ).toBe(1);
     expect(captureException).not.toHaveBeenCalled();
   });
 

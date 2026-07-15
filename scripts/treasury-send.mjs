@@ -13,8 +13,14 @@ import { createRequire } from "node:module";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(join(ROOT, "package.json"));
-const { Keypair, TransactionBuilder, Operation, Asset, Memo, Horizon } =
-  require("@stellar/stellar-sdk");
+const {
+  Keypair,
+  TransactionBuilder,
+  Operation,
+  Asset,
+  Memo,
+  Horizon,
+} = require("@stellar/stellar-sdk");
 
 function fail(msg) {
   console.error(`error: ${msg}`);

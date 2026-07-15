@@ -66,10 +66,9 @@ async function fetchTx(tok, { identifier, pageSize = 1 } = {}) {
 }
 
 async function fetchOrder(tok, orderId) {
-  const res = await fetch(
-    `${BASE}/pdax-institution/v1/orders/${encodeURIComponent(orderId)}`,
-    { headers: headers(tok) },
-  );
+  const res = await fetch(`${BASE}/pdax-institution/v1/orders/${encodeURIComponent(orderId)}`, {
+    headers: headers(tok),
+  });
   if (!res.ok) fail(`order -> ${res.status}: ${(await res.text()).slice(0, 300)}`);
   return (await res.json()).data;
 }
@@ -93,11 +92,7 @@ function printTx(label, tx) {
     console.log(`${label.padEnd(24)} ${C.dim("(not visible yet)")}`);
     return;
   }
-  const parts = [
-    colorStatus(tx.status, tx.declined_at),
-    `amount=${tx.amount}`,
-    `fee=${tx.fee}`,
-  ];
+  const parts = [colorStatus(tx.status, tx.declined_at), `amount=${tx.amount}`, `fee=${tx.fee}`];
   if (tx.declined_at) parts.push(C.red(`declined@${tx.declined_at}`));
   if (tx.rejection_reason) parts.push(C.red(`reason=${tx.rejection_reason}`));
   if (tx.created_at) parts.push(C.dim(`created=${tx.created_at}`));
@@ -116,7 +111,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.length === 0 || argv[0] === "-h" || argv[0] === "--help") {
-    console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(2, 12).join("\n"));
+    console.log(
+      readFileSync(fileURLToPath(import.meta.url), "utf8")
+        .split("\n")
+        .slice(2, 12)
+        .join("\n"),
+    );
     return;
   }
   const tok = await login();
